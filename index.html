@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Preflight Weight &amp; Balance + Performance</title>
+<style>
+:root{--bg:#f3f5f7;--card:#fff;--ink:#14212b;--mute:#5d6b77;--line:#d5dce2;--accent:#0b5c8e;--sub:#e8eef3;--warn:#8a4b00;--warnbg:#fff1d9;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10171d;--card:#18232c;--ink:#e6edf2;--mute:#93a3b0;--line:#2c3b47;--accent:#5bb6ea;--sub:#1f2e39;--warn:#ffcf85;--warnbg:#3a2a10;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10171d;--card:#18232c;--ink:#e6edf2;--mute:#93a3b0;--line:#2c3b47;--accent:#5bb6ea;--sub:#1f2e39;--warn:#ffcf85;--warnbg:#3a2a10;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 14px 48px}
+h1{font-size:1.5rem;margin:0 0 4px}
+h2{font-size:1.15rem;margin:0 0 12px;color:var(--accent)}
+.sub{color:var(--mute);margin:0 0 18px;font-size:.9rem}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+label{display:flex;flex-direction:column;font-size:.8rem;color:var(--mute);gap:3px}
+input{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%}
+input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tw{overflow-x:auto;margin-top:14px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:.9rem}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mute);font-weight:600}
+tr.t td{background:var(--sub);font-weight:700}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin-top:14px;font-variant-numeric:tabular-nums}
+.kv b{text-align:right}
+.w{background:var(--warnbg);color:var(--warn);border-radius:6px;padding:8px 10px;margin-top:10px;font-size:.88rem}
+.n{color:var(--mute);font-size:.82rem;margin-top:10px}
+h3{font-size:.95rem;margin:16px 0 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Preflight weight &amp; balance + performance</h1>
+<p class="sub">Takeoff table 2400 lb. Climb table 2550 lb, flaps up, full throttle. Landing table 2550 lb, flaps full, zero wind, paved, level, dry. Leave a field blank to use its default.</p>
+
+<section>
+<h2>Weight &amp; balance</h2>
+<div class="grid">
+<label>Basic empty weight (lb)<input id="bew" type="number" step="any" inputmode="decimal"></label>
+<label>Basic empty moment (lb-in)<input id="bem" type="number" step="any" inputmode="decimal"></label>
+<label>Front seat (lb)<input id="front" type="number" step="any" inputmode="decimal"></label>
+<label>Rear seat (lb)<input id="rear" type="number" step="any" inputmode="decimal"></label>
+<label>Forward baggage (lb)<input id="fbag" type="number" step="any" inputmode="decimal"></label>
+<label>Aft baggage (lb)<input id="abag" type="number" step="any" inputmode="decimal"></label>
+<label>Aft baggage arm (in, from POH)<input id="aarm" type="number" step="any" inputmode="decimal" value="0"></label>
+<label>Fuel loaded (gal)<input id="fuel" type="number" step="any" inputmode="decimal"></label>
+<label>Fuel burn (gal)<input id="burn" type="number" step="any" inputmode="decimal" placeholder="20"></label>
+</div>
+<div id="wbOut"></div>
+</section>
+
+<section>
+<h2>Takeoff &amp; climb</h2>
+<div class="grid">
+<label>Field elevation (ft MSL)<input id="elev" type="number" step="any" inputmode="decimal"></label>
+<label>Altimeter (inHg or hPa)<input id="alt" type="number" step="any" inputmode="decimal" placeholder="29.92"></label>
+<label>Surface temp (&deg;C)<input id="temp" type="number" step="any" inputmode="decimal"></label>
+<label>TPA above field (ft)<input id="tpa" type="number" step="any" inputmode="decimal" placeholder="1000"></label>
+</div>
+<div id="perfOut"></div>
+</section>
+
+<section>
+<h2>Landing (short field, flaps full)</h2>
+<p class="sub" style="margin-bottom:10px">Blank fields use the takeoff values above.</p>
+<div class="grid">
+<label>Landing elevation (ft MSL)<input id="lelev" type="number" step="any" inputmode="decimal"></label>
+<label>Landing altimeter (inHg or hPa)<input id="lalt" type="number" step="any" inputmode="decimal"></label>
+<label>Landing temp (&deg;C)<input id="ltemp" type="number" step="any" inputmode="decimal"></label>
+</div>
+<div id="ldgOut"></div>
+</section>
+</main>
+
+<script>
+const ARM_FRONT=37, ARM_REAR=73, ARM_FWD=95, ARM_FUEL=48, ARM_USED=48;
+const DENS=6.0, START_TAXI=-8.4, TO_WT=2400, ROC_WT=2550, LDG_WT=2550;
+const TEMPS=[0,10,20,30,40], ROC_TEMPS=[-20,0,20,40];
+const TAKEOFF={
+0:[[745,1275],[800,1370],[860,1470],[925,1570],[995,1685]],
+1000:[[810,1390],[875,1495],[940,1605],[1010,1720],[1085,1845]],
+2000:[[885,1520],[955,1635],[1030,1760],[1110,1890],[1190,2030]],
+3000:[[970,1665],[1050,1795],[1130,1930],[1215,2080],[1305,2230]],
+4000:[[1065,1830],[1150,1975],[1240,2130],[1335,2295],[1430,2455]],
+5000:[[1170,2015],[1265,2180],[1360,2355],[1465,2530],[1570,2715]],
+6000:[[1285,2230],[1390,2410],[1500,2610],[1610,2805],[1725,3015]],
+7000:[[1415,2470],[1530,2685],[1650,2900],[1770,3125],[1900,3370]],
+8000:[[1560,2755],[1690,3000],[1815,3240],[1950,3500],[2095,3790]]};
+const LANDING={
+0:[[545,1290],[565,1320],[585,1350],[605,1380],[625,1415]],
+1000:[[565,1320],[585,1350],[605,1385],[625,1420],[650,1450]],
+2000:[[585,1355],[610,1385],[630,1420],[650,1455],[670,1490]],
+3000:[[610,1385],[630,1425],[655,1460],[675,1495],[695,1530]],
+4000:[[630,1425],[655,1460],[675,1495],[700,1535],[725,1570]],
+5000:[[655,1460],[680,1500],[705,1535],[725,1575],[750,1615]],
+6000:[[680,1500],[705,1540],[730,1580],[755,1620],[780,1660]],
+7000:[[705,1545],[730,1585],[760,1625],[785,1665],[810,1705]],
+8000:[[735,1585],[760,1630],[790,1670],[815,1715],[840,1755]]};
+const ROC={
+0:[74,[855,785,710,645]],2000:[73,[760,695,625,560]],4000:[73,[685,620,555,495]],
+6000:[73,[575,515,450,390]],8000:[72,[465,405,345,285]],
+10000:[72,[360,300,240,180]],12000:[72,[255,195,135,null]]};
+const STD=29.92, LAPSE=2.0;
+
+const $=id=>document.getElementById(id);
+const num=(id,d=0)=>{const v=parseFloat($(id).value);return isNaN(v)?d:v};
+const has=id=>!isNaN(parseFloat($(id).value));
+const f=(v,n=0)=>Number(v).toFixed(n);
+
+function lerp(x,x0,x1,y0,y1){
+  if(y0==null||y1==null)return null;
+  if(x1===x0)return y0;
+  return y0+(y1-y0)*(x-x0)/(x1-x0);
+}
+function bracket(v,pts){
+  pts=pts.map(Number).sort((a,b)=>a-b);
+  if(v<=pts[0])return[pts[0],pts[0]];
+  if(v>=pts[pts.length-1])return[pts[pts.length-1],pts[pts.length-1]];
+  for(let i=0;i<pts.length-1;i++)if(pts[i]<=v&&v<=pts[i+1])return[pts[i],pts[i+1]];
+}
+const pressAlt=(m,a)=>m+(STD-a)*1000;
+const densAlt=(pa,t)=>pa+120*(t-(15-LAPSE*pa/1000));
+function interpTable(tbl,pa,t,idx){
+  const[a0,a1]=bracket(pa,Object.keys(tbl));
+  const[t0,t1]=bracket(t,TEMPS);
+  const i0=TEMPS.indexOf(t0),i1=TEMPS.indexOf(t1);
+  const at=a=>{const r=tbl[a];return lerp(t,t0,t1,r[i0][idx],r[i1][idx])};
+  return lerp(pa,a0,a1,at(a0),at(a1));
+}
+function interpRoc(pa,t){
+  const[a0,a1]=bracket(pa,Object.keys(ROC));
+  const[t0,t1]=bracket(t,ROC_TEMPS);
+  const i0=ROC_TEMPS.indexOf(t0),i1=ROC_TEMPS.indexOf(t1);
+  const at=a=>{const r=ROC[a][1];return lerp(t,t0,t1,r[i0],r[i1])};
+  return[lerp(pa,a0,a1,at(a0),at(a1)),lerp(pa,a0,a1,ROC[a0][0],ROC[a1][0])];
+}
+function rocText(pa,t){
+  const[r,s]=interpRoc(pa,t);
+  return r==null?"no table data at this altitude/temperature":`${f(r)} ft/min at ${f(s)} KIAS`;
+}
+const warn=m=>`<div class="w">${m}</div>`;
+const kv=(k,v)=>`<span>${k}</span><b>${v}</b>`;
+function readAlt(id,def){
+  let a=num(id,def);
+  return a>100?a/33.8639:a;
+}
+
+function wb(){
+  const bew=num("bew"),bem=num("bem");
+  if(bew<=0){$("wbOut").innerHTML=`<p class="n">Enter basic empty weight and moment to begin.</p>`;return null}
+  const front=num("front"),rear=num("rear"),fb=num("fbag"),ab=num("abag"),aarm=num("aarm");
+  const rows=[];
+  const row=(name,w,m,cls="")=>rows.push(`<tr class="${cls}"><td>${name}</td><td>${f(w,1)}</td><td>${f(w?m/w:0,2)}</td><td>${f(m,1)}</td></tr>`);
+  const items=[["Basic empty",bew,bem],["Front seat",front,front*ARM_FRONT],["Rear seat",rear,rear*ARM_REAR],
+    ["Fwd baggage",fb,fb*ARM_FWD],["Aft baggage",ab,ab*aarm]];
+  items.forEach(i=>row(...i));
+  const zfw=items.reduce((s,i)=>s+i[1],0),zfm=items.reduce((s,i)=>s+i[2],0);
+  row("Zero fuel",zfw,zfm,"t");
+  const fg=num("fuel"),fw=fg*DENS,fm=fw*ARM_FUEL;
+  row("Fuel",fw,fm);
+  const rw=zfw+fw,rm=zfm+fm;
+  row("Ramp",rw,rm,"t");
+  const um=START_TAXI*ARM_USED;
+  row("Start/taxi",START_TAXI,um);
+  const tw=rw+START_TAXI,tm=rm+um;
+  row("Takeoff",tw,tm,"t");
+  const bg=num("burn",20),bw=-bg*DENS,bm=bw*ARM_FUEL;
+  row("Fuel burn",bw,bm);
+  const lw=tw+bw,lm=tm+bm;
+  row("Landing",lw,lm,"t");
+  let h=`<p class="n">Basic empty arm: ${f(bem/bew,2)} in</p><div class="tw"><table><thead><tr><th>Item</th><th>Weight (lb)</th><th>Arm (in)</th><th>Moment</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+  if(ab>0&&aarm===0)h+=warn("Aft baggage arm is 0. Enter it from your POH or the CG result will be wrong.");
+  if(bg>fg)h+=warn("Fuel burn exceeds the fuel loaded.");
+  if(tw>ROC_WT)h+=warn(`Takeoff weight ${f(tw)} lb exceeds ${ROC_WT} lb; neither performance table applies.`);
+  else if(tw>TO_WT)h+=warn(`Takeoff weight ${f(tw)} lb exceeds the ${TO_WT} lb takeoff chart; real takeoff distances will be longer than shown.`);
+  $("wbOut").innerHTML=h;
+  return[tw,lw];
+}
+
+function perf(tw){
+  if(tw==null||!has("elev")&&!has("temp")&&!has("alt")){
+    $("perfOut").innerHTML=`<p class="n">Enter elevation, altimeter and temperature.</p>`;
+    return null;
+  }
+  const elev=num("elev"),alt=readAlt("alt",STD),temp=num("temp");
+  const pa=pressAlt(elev,alt),da=densAlt(pa,temp);
+  let h=`<div class="kv">${kv("Takeoff weight",f(tw)+" lb")}${kv("Pressure altitude",f(pa)+" ft")}${kv("Density altitude",f(da)+" ft")}${kv("Temperature",f(temp,1)+" °C")}</div>`;
+  if(pa<0||pa>8000||temp<0||temp>40)h+=warn("Input is outside the takeoff table (0–8000 ft, 0–40 °C). Values are held at the table edge, so treat results with caution.");
+  h+=`<div class="kv">${kv("Ground roll",f(interpTable(TAKEOFF,pa,temp,0))+" ft")}${kv("Total to clear 50 ft",f(interpTable(TAKEOFF,pa,temp,1))+" ft")}${kv("Rate of climb (field)",rocText(pa,temp))}</div>`;
+  const tpa=num("tpa",1000);
+  if(tpa>0){
+    const tm=elev+tpa,tp=pressAlt(tm,alt),tt=temp-LAPSE*tpa/1000;
+    h+=`<h3>TPA: ${f(tm)} ft MSL</h3><div class="kv">${kv("Pressure altitude",f(tp)+" ft")}${kv("Estimated temp",f(tt,1)+" °C")}${kv("Rate of climb",rocText(tp,tt))}</div>`;
+  }
+  h+=`<p class="n">Takeoff table ${TO_WT} lb, climb table ${ROC_WT} lb (conservative if you are lighter).</p>`;
+  if(tw>TO_WT)h+=warn(`Takeoff weight is above ${TO_WT} lb, so takeoff distances are optimistic.`);
+  $("perfOut").innerHTML=h;
+  return[elev,alt,temp];
+}
+
+function ldg(lw,base){
+  if(lw==null||base==null){$("ldgOut").innerHTML=`<p class="n">Complete the sections above first.</p>`;return}
+  const elev=num("lelev",base[0]),alt=readAlt("lalt",base[1]),temp=num("ltemp",base[2]);
+  const pa=pressAlt(elev,alt),da=densAlt(pa,temp);
+  let h=`<div class="kv">${kv("Landing weight",f(lw)+" lb")}${kv("Pressure altitude",f(pa)+" ft")}${kv("Density altitude",f(da)+" ft")}${kv("Temperature",f(temp,1)+" °C")}</div>`;
+  if(pa<0||pa>8000||temp<0||temp>40)h+=warn("Input is outside the landing table (0–8000 ft, 0–40 °C). Values are held at the table edge, so treat results with caution.");
+  h+=`<div class="kv">${kv("Landing ground roll",f(interpTable(LANDING,pa,temp,0))+" ft")}${kv("Total to clear 50 ft",f(interpTable(LANDING,pa,temp,1))+" ft")}</div>`;
+  h+=lw>LDG_WT?warn(`Landing weight is above ${LDG_WT} lb; the table does not apply.`)
+    :`<p class="n">Table is for ${LDG_WT} lb (conservative if you are lighter), zero wind, paved, level, dry runway, max braking, 61 KIAS at 50 ft.</p>`;
+  $("ldgOut").innerHTML=h;
+}
+
+function run(){
+  const r=wb();
+  const base=perf(r?r[0]:null);
+  ldg(r?r[1]:null,base);
+}
+document.querySelectorAll("input").forEach(i=>i.addEventListener("input",run));
+run();
+</script>
+</body>
+</html>
